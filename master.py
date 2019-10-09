@@ -4,10 +4,11 @@ import multiprocessing
 from worker import Worker
 
 
-def run_worker(port_id):
-    worker = Worker(port_id)
+def run_worker():
+    worker = Worker()
     worker.run()
 
 
 if __name__ == '__main__':
-    multiprocessing.Process(target=run_worker, args=(1, ))
+    proc = multiprocessing.Process(target=run_worker)
+    proc.start()
