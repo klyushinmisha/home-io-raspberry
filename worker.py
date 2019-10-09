@@ -1,6 +1,6 @@
 import redis
 import json
-from smbus2 import SMBus
+import serial
 
 
 class Worker:
@@ -9,15 +9,12 @@ class Worker:
         self.port_id = port_id
 
     def run():
-        is_running = True
-        with SMBus(self.port_id) as bus:
-            while is_running:
-                try:
-                    block = bus.read_i2c_block_data(80, 0, 16)
-                    self.save_telemetry(block)
-                except Exception as e:
-                    print(e)
-                    is_running = False
+        ser = serial.Serial(port='/dev/ttyACM0', baudrate=9600)
+        while True:
+            try:
+                out = ser.read(4)
+                print(out)
+                time.sleep(200)
 
     def save_telemetry(block):
         r.set('test', block.decode('ascii'))
