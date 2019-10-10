@@ -5,6 +5,8 @@ import time
 import redis
 import serial
 
+from redis_dict import to_redis_format, to_python_format
+
 
 class ProtocolState(enum.Enum):
     INITIAL = 0
@@ -36,7 +38,7 @@ class Worker:
             'enabled': True,
             'telemetry': []
         }
-        r.set(self.slave_sn, slave_data)
+        self.redis.set(self.slave_sn, to_redis_format(slave_data))
         while True:
             try:
                 self.proc_recieved_data()
@@ -57,13 +59,15 @@ class Worker:
         pass
 
     def save_telemetry(self, tel):
-        slave_cache = r.get(self.slave_sn)
+        slave_cache = self.redis.get(self.slave_sn)
+        print(slave_cache)
         slave_cache['telemetry'].append(tel)
-        r.set(self.slave_sn, slave_cache)
+        self.redis.set(self.slave_sn, slave_cache)
 
     def init_conn(self):
         state = ProtocolState.INITIAL
         while True:
+            print(state)
             try:
                 if state == ProtocolState.INITIAL:
                     msg = self.ser.read(3).decode()
@@ -77,7 +81,7 @@ class Worker:
                     state = ProtocolState.ACK_SERIAL
 
                 elif state == ProtocolState.ACK_SERIAL:
-                    self.slave_type = self.ser.readline.decode()
+                    self.slave_type = self.ser.readline().decode()
                     self.ser.write('ACK_TYPE'.encode())
                     state = ProtocolState.ACK_TYPE
 
