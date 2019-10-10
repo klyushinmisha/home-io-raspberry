@@ -4,6 +4,7 @@ import multiprocessing
 from worker import Worker
 
 
+# TODO: lock uuid key on upload
 def run_worker():
     worker = Worker()
     worker.run()
