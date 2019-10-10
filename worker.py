@@ -2,6 +2,7 @@ import enum
 import json
 import time
 
+import arrow
 import redis
 import serial
 
@@ -36,9 +37,9 @@ class Worker:
         slave_data = {
             'type': self.slave_type,
             'enabled': True,
-            'telemetry': []
+            'telemetry': {}
         }
-        self.redis.set(self.slave_sn, to_redis_format(slave_data))
+        self.redis.hmset(self.slave_sn, to_redis_format(slave_data))
         while True:
             try:
                 self.proc_recieved_data()
@@ -59,10 +60,10 @@ class Worker:
         pass
 
     def save_telemetry(self, tel):
-        slave_cache = self.redis.get(self.slave_sn)
+        slave_cache = self.redis.hmgetall(self.slave_sn)
         print(slave_cache)
-        slave_cache['telemetry'].append(tel)
-        self.redis.set(self.slave_sn, slave_cache)
+        slave_cache['telemetry'][arrow.utcnow()] = tel
+        self.redis.hmset(self.slave_sn, slave_cache)
 
     def init_conn(self):
         state = ProtocolState.INITIAL
