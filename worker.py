@@ -25,29 +25,36 @@ class DeviceTypeEnum(enum.Enum):
 
 class Worker:
     def __init__(self):
-        self.redis = redis.Redis(host='localhost', port=6379, db=0)
+        self.settings_db = redis.Redis(host='localhost', port=6379, db=0)
+        self.telemetry_db = redis.Redis(host='localhost', port=6379, db=1)
+        self.settings_db.flushall()
+        self.telemetry_db.flushall()
 
     def run(self):
         # create serial bus connection
         self.ser = serial.Serial(port='/dev/ttyACM0', baudrate=9600)
+        print("Connecting to device...")
         if not self.init_conn():
             return
 
+        print("Ready!")
+
         # set slave initial data
-        slave_data = {
+        slave_settings = {
             'type': self.slave_type,
-            'enabled': True,
-            'telemetry': {}
+            'enabled': True
         }
-        self.redis.hmset(self.slave_sn, to_redis_format(slave_data))
+        self.settings_db.hmset(self.slave_sn, to_redis_format(slave_settings))
         while True:
             try:
                 self.proc_recieved_data()
                 self.send_commands()
-            except:
+                time.sleep(1)
+            except Exception as e:
+                print(e)
                 return
 
-    def proc_recieved_data():
+    def proc_recieved_data(self):
         if self.slave_type == 'humidity_sensor':
             tel = self.ser.read(1).decode()
             self.save_telemetry(tel)
@@ -55,20 +62,20 @@ class Worker:
             tel = self.ser.read(1).decode()
             self.save_telemetry(tel)
 
-    def send_commands():
+    def send_commands(self):
         # TODO: send commands to end devices
         pass
 
     def save_telemetry(self, tel):
-        slave_cache = self.redis.hmgetall(self.slave_sn)
-        print(slave_cache)
-        slave_cache['telemetry'][arrow.utcnow()] = tel
-        self.redis.hmset(self.slave_sn, slave_cache)
+        slave_tel = {}
+        if self.telemetry_db.exists(self.slave_sn):
+            slave_tel = self.telemetry_db.hgetall(self.slave_sn)
+        slave_tel[str(arrow.utcnow())] = tel
+        self.telemetry_db.hmset(self.slave_sn, slave_tel)
 
     def init_conn(self):
         state = ProtocolState.INITIAL
         while True:
-            print(state)
             try:
                 if state == ProtocolState.INITIAL:
                     msg = self.ser.read(3).decode()
@@ -82,7 +89,8 @@ class Worker:
                     state = ProtocolState.ACK_SERIAL
 
                 elif state == ProtocolState.ACK_SERIAL:
-                    self.slave_type = self.ser.readline().decode()
+                    recieved_type = self.ser.readline().decode()
+                    self.slave_type = recieved_type.strip('\r\n')
                     self.ser.write('ACK_TYPE'.encode())
                     state = ProtocolState.ACK_TYPE
 
