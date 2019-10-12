@@ -1,6 +1,7 @@
 import enum
 import json
 import time
+import platform
 
 import arrow
 import redis
@@ -31,8 +32,14 @@ class Worker:
         self.telemetry_db.flushall()
 
     def run(self):
+        # select unix device file (depends on OS)
+        if platform.system() == 'Darwin':
+            port='/dev/tty.usbmodem1451'
+        elif platform.system() == 'Linux':
+            port='/dev/ttyACM0'
+
         # create serial bus connection
-        self.ser = serial.Serial(port='/dev/ttyACM0', baudrate=9600)
+        self.ser = serial.Serial(port=port, baudrate=9600)
         print("Connecting to device...")
         if not self.init_conn():
             return
